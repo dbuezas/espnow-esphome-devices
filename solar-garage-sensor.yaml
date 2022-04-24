@@ -1,0 +1,35 @@
+esphome:
+  name: solar-garage-sensor
+  includes:
+    - esp-now/EspRC.h
+  libraries:
+    - ESP8266WiFi
+          
+
+esp8266:
+  board: esp01_1m
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO2
+    id: "leds"
+
+sensor:
+  - platform: adc
+    pin: VCC
+    name: "VCC Voltage"
+    accuracy_decimals: 5
+    force_update: true
+    on_value:
+      then:
+        - lambda: |-
+            EspRC.begin();
+            wifi_set_channel(11); // IMPORTANT! this is the gateway's wifi channel.
+            EspRC.send("solar_garage_motion", "moved");
+            EspRC.send("solar_garage_vcc_sensor_v", String(x, 5));
+            bool light = digitalRead(2);
+            EspRC.send("solar_garage_light", light ? 1 : 0);
+        - deep_sleep.enter:
+
+
+deep_sleep:

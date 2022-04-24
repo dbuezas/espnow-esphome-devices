@@ -1,0 +1,99 @@
+esphome:
+  name: gateway
+  platform: ESP8266
+  board: d1_mini
+  includes:
+    - esp-now/EspRC.h
+wifi:
+  ssid: !secret wifi_name
+  password: !secret wifi_pass
+  fast_connect: true
+  # power_save_mode: HIGH # This makes esp-now loss packages.
+
+
+custom_component:
+- lambda: |-
+    EspRC.begin();
+    EspRC.on("battery-sensor-v", []() {
+      float value = EspRC.getValue().toFloat();
+      id(battery_sensor_v).publish_state(value);
+    });
+    EspRC.on("solar_garage_motion", []() {
+      id(solar_garage_motion).publish_state(true);
+    });
+    EspRC.on("solar_garage_vcc_sensor_v", []() {
+      float value = EspRC.getValue().toFloat();
+      id(solar_garage_vcc_sensor_v).publish_state(value);
+    });
+    EspRC.on("solar_garage_light", []() {
+      float value = EspRC.getValue().toFloat();
+      id(solar_garage_led).publish_state(value ? true : false);
+    });
+    return {};
+# Enable Home Assistant API
+
+api:
+
+ota:
+
+logger:
+  baud_rate: 0
+  level: DEBUG
+
+############################################## SENSORS ###############################################
+binary_sensor:
+  - platform: template
+    name: "solar_garage_led"
+    id: solar_garage_led
+    on_press:
+      then:
+        - delay: 30s
+        - binary_sensor.template.publish:
+            id: solar_garage_led
+            state: off
+  - platform: template
+    name: "solar_garage_motion"
+    id: solar_garage_motion
+    device_class: motion
+    on_press:
+      then:
+        - delay: 5s
+        - binary_sensor.template.publish:
+            id: solar_garage_motion
+            state: off
+
+
+sensor:
+  - platform: template
+    id: solar_garage_vcc_sensor_v
+    name: solar_garage_vcc_sensor_v
+    unit_of_measurement: V
+    icon: mdi:sine-wave
+    accuracy_decimals: 5
+    update_interval: never
+  - platform: template
+    id: battery_sensor_v
+    name: battery_esp8266_sensor_v
+    unit_of_measurement: V
+    icon: mdi:sine-wave
+    accuracy_decimals: 5
+    update_interval: never
+    force_update: true
+    on_value:
+      then:
+        - light.toggle:
+            id: light_1
+        
+light:
+  - platform: monochromatic
+    id: "light_1"
+    default_transition_length: 0s
+    output: output_component1
+
+# Example output entry
+output:
+  - platform: esp8266_pwm
+    id: output_component1
+    pin:
+      number: D4
+      inverted: true
